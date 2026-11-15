@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Round Robin</title>
+  <style>
+    :root {
+      --bg1: #eef2ff; --bg2: #fdf2f8; --card: #ffffff; --fg: #1e293b; --muted: #64748b; --border: #cbd5e1;
+      --input-bg: #f8fafc; --primary: #4f46e5; --primary2: #7c3aed; --soft: #e0e7ff;
+      --shadow: 0 10px 30px rgba(79, 70, 229, 0.12);
+      --bar-s: 75%; --bar-l: 85%; --bar-fg: #1e293b;
+      color-scheme: light dark;
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg1: #0f172a; --bg2: #1e1b4b; --card: #1e293b; --fg: #f1f5f9; --muted: #94a3b8; --border: #475569;
+        --input-bg: #0f172a; --primary: #6366f1; --primary2: #8b5cf6; --soft: #312e81;
+        --shadow: none; --bar-s: 45%; --bar-l: 32%; --bar-fg: #f1f5f9;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg1: #0f172a; --bg2: #1e1b4b; --card: #1e293b; --fg: #f1f5f9; --muted: #94a3b8; --border: #475569;
+      --input-bg: #0f172a; --primary: #6366f1; --primary2: #8b5cf6; --soft: #312e81;
+      --shadow: none; --bar-s: 45%; --bar-l: 32%; --bar-fg: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--fg);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      background-color: var(--bg1);
+      background-image: linear-gradient(160deg, var(--bg1), var(--bg2));
+      background-attachment: fixed;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 28px 16px 48px; }
+
+    .hero { text-align: center; margin-bottom: 20px; }
+    .hero h1 { margin: 0; font-size: 34px; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero p { margin: 8px 0 0; color: var(--muted); }
+
+    .card { background: var(--card); border-radius: 16px; padding: 18px; margin-top: 16px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .card h2 { margin: 0 0 12px; font-size: 18px; }
+
+    .head, .row { display: grid; grid-template-columns: 1.3fr 1fr 1fr 40px; gap: 8px; align-items: center; }
+    .head { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 6px; }
+    .row { margin-bottom: 8px; }
+
+    input { width: 100%; min-width: 0; padding: 10px; font-size: 16px; color: var(--fg); background: var(--input-bg);
+      border: 1px solid var(--border); border-radius: 10px; }
+    input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+    button { font-size: 16px; font-family: inherit; cursor: pointer; border-radius: 10px; transition: transform 0.1s, opacity 0.2s; }
+    button:hover { opacity: 0.9; }
+    button:active { transform: scale(0.98); }
+    .icon { width: 40px; height: 40px; padding: 0; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 20px; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .ghost { padding: 10px 14px; border: 1px solid var(--border); background: transparent; color: var(--fg); }
+    .primary { width: 100%; margin-top: 16px; padding: 14px; border: 0; color: #ffffff; font-weight: 600;
+      background: linear-gradient(135deg, var(--primary), var(--primary2)); }
+
+    .quantum { margin-top: 16px; }
+    .quantum label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 6px; }
+    .note { color: var(--muted); font-size: 13px; margin: 14px 0 0; }
+
+    .scroll { overflow-x: auto; }
+    .gantt { display: flex; min-width: 100%; }
+    .seg { position: relative; padding-bottom: 22px; min-width: 38px; }
+    .bar { text-align: center; padding: 12px 0; font-size: 14px; font-weight: 600; color: var(--bar-fg);
+      background: hsl(var(--h, 0), var(--bar-s), var(--bar-l)); border-right: 2px solid var(--card); }
+    .idle .bar { background: transparent; border: 1px dashed var(--border); color: var(--muted); font-weight: 400; }
+    .t { position: absolute; left: 0; bottom: 0; font-size: 12px; color: var(--muted); }
+    .tend { position: absolute; right: 0; bottom: 0; font-size: 12px; color: var(--muted); }
+
+    table { border-collapse: collapse; width: 100%; }
+    th { background: var(--soft); font-size: 13px; }
+    th, td { padding: 8px; text-align: center; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .avg { display: flex; gap: 12px; flex-wrap: wrap; }
+    .avg div { flex: 1; min-width: 140px; background: var(--soft); border-radius: 12px; padding: 12px; text-align: center; font-size: 13px; color: var(--muted); }
+    .avg strong { display: block; font-size: 26px; color: var(--fg); margin-top: 4px; }
+    .error { color: #dc2626; margin: 12px 0 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1>Round Robin</h1>
+      <p>Введите процессы и квант времени, получите диаграмму Ганта</p>
+    </header>
+
+    <section class="card">
+      <h2>Данные</h2>
+      <div class="head"><span>Процесс</span><span>Arrival</span><span>Burst</span><span></span></div>
+      <div id="rows"></div>
+      <div class="btn-row">
+        <button type="button" class="ghost" onclick="addRow()">+ Добавить процесс</button>
+        <button type="button" class="ghost" onclick="fillExample()">Пример</button>
+        <button type="button" class="ghost" onclick="clearAll()">Очистить</button>
+      </div>
+      <div class="quantum">
+        <label for="quantum">Квант времени</label>
+        <input id="quantum" type="number" min="1" placeholder="2">
+      </div>
+      <p class="note">Если процесс приходит в тот же момент, когда у другого закончился квант, новый встаёт в очередь раньше вытесненного.</p>
+      <button type="button" class="primary" onclick="runRR()">Запустить</button>
+    </section>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function esc(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function addRow(name, arrival, burst) {
+      var rows = document.getElementById("rows");
+      var idx = rows.children.length + 1;
+      var row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        '<input class="f-name" type="text" placeholder="P' + idx + '">' +
+        '<input class="f-arr" type="number" min="0" placeholder="0">' +
+        '<input class="f-burst" type="number" min="1" placeholder="5">' +
+        '<button type="button" class="icon" title="Удалить">×</button>';
+      if (name !== undefined) {
+        row.querySelector(".f-name").value = name;
+        row.querySelector(".f-arr").value = arrival;
+        row.querySelector(".f-burst").value = burst;
+      }
+      row.querySelector(".icon").onclick = function () {
+        if (rows.children.length > 1) { rows.removeChild(row); }
+      };
+      rows.appendChild(row);
+    }
+
+    function clearAll() {
+      document.getElementById("rows").innerHTML = "";
+      document.getElementById("quantum").value = "";
+      document.getElementById("result").innerHTML = "";
+      addRow(); addRow();
+    }
+
+    function fillExample() {
+      document.getElementById("rows").innerHTML = "";
+      addRow("P1", 0, 5); addRow("P2", 1, 3); addRow("P3", 2, 1); addRow("P4", 3, 2);
+      document.getElementById("quantum").value = 2;
+    }
+
+    function showError(msg) {
+      document.getElementById("result").innerHTML = '<p class="error">' + msg + "</p>";
+    }
+
+    function runRR() {
+      var rowEls = document.querySelectorAll("#rows .row");
+      var names = [], arrivals = [], bursts = [];
+      for (var r = 0; r < rowEls.length; r++) {
+        var nm = rowEls[r].querySelector(".f-name").value.trim();
+        var a = rowEls[r].querySelector(".f-arr").value.trim();
+        var b = rowEls[r].querySelector(".f-burst").value.trim();
+        if (a === "" || b === "") { showError("Заполните Arrival и Burst в строке " + (r + 1) + "."); return; }
+        names.push(nm === "" ? "P" + (r + 1) : nm);
+        arrivals.push(Number(a));
+        bursts.push(Number(b));
+      }
+      var qv = document.getElementById("quantum").value.trim();
+      if (qv === "") { showError("Введите квант времени."); return; }
+      var q = Number(qv);
+      var n = names.length;
+
+      if (arrivals.some(function (x) { return isNaN(x) || x < 0; })) { showError("Arrival — числа от 0 и больше."); return; }
+      if (bursts.some(function (x) { return isNaN(x) || x <= 0; })) { showError("Burst — только положительные числа."); return; }
+      if (isNaN(q) || q <= 0) { showError("Квант времени должен быть больше нуля."); return; }
+
+      var order = [];
+      for (var x = 0; x < n; x++) { order.push(x); }
+      order.sort(function (p, s) { return arrivals[p] - arrivals[s] || p - s; });
+
+      var remaining = bursts.slice();
+      var finish = [], gantt = [], queue = [];
+      var next = 0, done = 0, time = 0;
+
+      function addArrived() {
+        while (next < n && arrivals[order[next]] <= time) { queue.push(order[next]); next++; }
+      }
+
+      addArrived();
+      while (done < n) {
+        if (queue.length === 0) {
+          var wake = arrivals[order[next]];
+          gantt.push({ name: "простой", start: time, end: wake, idle: true, pi: 0 });
+          time = wake;
+          addArrived();
+          continue;
+        }
+        var i = queue.shift();
+        var run = Math.min(q, remaining[i]);
+        gantt.push({ name: names[i], start: time, end: time + run, idle: false, pi: i });
+        time += run;
+        remaining[i] -= run;
+        addArrived();
+        if (remaining[i] > 0) { queue.push(i); } else { finish[i] = time; done++; }
+      }
+
+      var rows = "", sumW = 0, sumT = 0;
+      for (var k = 0; k < n; k++) {
+        var tat = finish[k] - arrivals[k];
+        var wt = tat - bursts[k];
+        sumW += wt; sumT += tat;
+        rows += "<tr><td>" + esc(names[k]) + "</td><td>" + arrivals[k] + "</td><td>" + bursts[k] + "</td><td>" + finish[k] + "</td><td>" + tat + "</td><td>" + wt + "</td></tr>";
+      }
+
+      var segs = gantt.map(function (g, idx) {
+        var last = idx === gantt.length - 1;
+        return '<div class="seg' + (g.idle ? " idle" : "") + '" style="flex:' + (g.end - g.start) + "; --h:" + ((g.pi * 67 + 230) % 360) + '">' +
+          '<div class="bar">' + esc(g.name) + "</div>" +
+          '<span class="t">' + g.start + "</span>" +
+          (last ? '<span class="tend">' + g.end + "</span>" : "") + "</div>";
+      }).join("");
+
+      var out = document.getElementById("result");
+      out.innerHTML =
+        '<section class="card"><h2>Диаграмма Ганта</h2><div class="scroll"><div class="gantt">' + segs + "</div></div></section>" +
+        '<section class="card scroll"><table><tr><th>Процесс</th><th>Arrival</th><th>Burst</th><th>Completion</th><th>Turnaround</th><th>Waiting</th></tr>' + rows + "</table></section>" +
+        '<section class="card"><div class="avg"><div>Среднее Waiting<strong>' + (sumW / n).toFixed(2) + "</strong></div><div>Среднее Turnaround<strong>" + (sumT / n).toFixed(2) + "</strong></div></div></section>";
+      out.scrollIntoView({ behavior: "smooth" });
+    }
+
+    addRow(); addRow(); addRow();
+  </script>
+</body>
+</html>
